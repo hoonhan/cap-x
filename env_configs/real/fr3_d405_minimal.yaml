@@ -1,0 +1,43 @@
+# Minimal FR3 + RealSense D405 bringup config
+# Usage:
+#   uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/fr3_d405_minimal.yaml
+
+env:
+  _target_: capx.envs.tasks.franka.franka_lift.FrankaLiftCodeEnv
+  cfg:
+    _target_: capx.envs.tasks.base.CodeExecEnvConfig
+    low_level: franka_real_low_level
+    privileged: false
+    apis:
+      - FrankaRealMinimalApi
+    task_only_prompt: "do a simple proof-of-concept motion on FR3"
+    prompt: |
+      You control a real FR3 robot arm.
+      Goal: run a safe proof-of-concept motion.
+      Constraints:
+      - Use only tiny joint deltas (<= 0.08 rad each move).
+      - Keep motions slow and conservative.
+      - Do not attempt grasping unless requested.
+
+      You may only emit executable Python code (no markdown fences).
+      The robot control functions are already imported.
+
+      Suggested minimal sequence:
+      1) open_gripper()
+      2) move_by_joint_delta([0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+      3) hold_position(1.0)
+      4) move_by_joint_delta([-0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+      5) hold_position(1.0)
+
+api_servers: []
+
+record_video: true
+use_img_differencing: false
+output_dir: ./outputs/fr3_d405_minimal
+
+web_ui: true
+# web_ui_port: 8200
+
+debug: true
+trials: 1
+num_workers: 1

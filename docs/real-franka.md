@@ -56,3 +56,61 @@ In a separate terminal with the [robots_realtime](https://github.com/uynitsuj/ro
 ```bash
 uv run rr-session configs/franka/franka_robotiq_client.yaml
 ```
+
+---
+
+## FR3 + Dual RealSense D405 (Minimal POC)
+
+If your goal is a **minimal real-hardware proof of concept** (small primitive motions, no grasp planning stack), use:
+
+```bash
+uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/fr3_d405_minimal.yaml
+```
+
+This config uses `FrankaRealMinimalApi`, which exposes small primitive actions:
+- `move_to_joint_positions(joints)`
+- `move_by_joint_delta(delta_joints)`
+- `set_gripper_opening(fraction)`
+- `open_gripper()`, `close_gripper()`
+- `hold_position(duration_seconds=1.0, hz=25.0)`
+- `get_camera_observation(camera_name=...)`
+
+### Dual-camera extrinsics template
+
+A starting template is provided at:
+
+`env_configs/real/camera_extrinsics/fr3_dual_d405_example.yaml`
+
+The template now includes your provided FR3 + D405 measured camera positions and look-at targets as a starting point:
+- `camera_top`: `(1.35, 0.00, 0.53)` looking at `(0.20, 0.00, 0.00)`
+- `camera_wrist_side`: `(0.50, 0.69, 0.50)` looking at `(0.50, 0.00, 0.10)`
+
+Copy these values into your `robots_realtime` camera-extrinsics configuration.
+The included `rpy_radians` are look-at-derived initial values and may need final refinement because camera-frame conventions can differ across sensor wrappers.
+
+### Practical calibration guide (no extra calibration scripts required)
+
+You mentioned `calibrate_camera` duplication is unnecessary; this workflow does **not** add any extra calibration tooling.
+
+Use this lightweight process instead:
+1. Start with the template extrinsics above.
+2. Run `rr-session` + CaP-X minimal config and view the live feed(s).
+3. Pick an object with known location in robot base frame.
+4. Compare expected vs observed object location in each camera stream.
+5. Tune each camera's `rpy_radians` (small increments, e.g. 0.02–0.05 rad) and then `position` (1–2 cm) until overlays / reprojections align.
+6. Re-verify at multiple workspace points, not just one center point.
+
+If you compare against GraspVLA configs, it can help as a **reference check** for layout conventions, but this CaP-X setup does not require installing GraspVLA or adding its dependencies.
+
+### Multi-camera observation mapping
+
+In the real low-level adapter:
+- the first discovered `camera_*` stream is mapped to `robot0_robotview` (for compatibility),
+- additional streams are preserved under their original keys (e.g. `camera_wrist_side`).
+
+You can fetch any camera stream with:
+
+```python
+cam_top = get_camera_observation(\"robot0_robotview\")
+cam_side = get_camera_observation(\"camera_wrist_side\")
+```
