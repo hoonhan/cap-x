@@ -8,6 +8,27 @@ The default task configured in [`env_configs/real/real.yaml`](../env_configs/rea
 
 Beyond a Franka Panda robot arm, this workflow requires a **stereo camera that produces calibrated metric-scale depth maps** (e.g. a ZED stereo camera). The depth data is used by SAM3 + Contact-GraspNet to generate grasp poses in 3D. A monocular RGB-only camera may be insufficient.
 
+## Where to get camera serial numbers and FR3 IP
+
+### RealSense camera serial numbers
+
+On the machine connected to your D405 cameras:
+
+```bash
+rs-enumerate-devices -s
+```
+
+This prints each camera serial number (and USB details). Use those serials in your camera client config so each stream is consistently assigned (e.g., `camera_top` vs `camera_wrist_side`).
+
+### FR3 / Franka controller IP
+
+Use one of the following:
+- **Franka Desk / controller network settings** (recommended source of truth).
+- Router / DHCP lease table for the robot MAC address.
+- `ping <robot-hostname-or-ip>` from the control PC to verify reachability.
+
+For reliability, prefer a DHCP reservation or static IP assignment so client configs don't break across reboots.
+
 ## Camera Extrinsics Setup
 
 The `robots_realtime` client config points to a camera extrinsics file that describes the camera's pose in the robot world frame. You must create one for your own setup.
@@ -101,6 +122,32 @@ Use this lightweight process instead:
 6. Re-verify at multiple workspace points, not just one center point.
 
 If you compare against GraspVLA configs, it can help as a **reference check** for layout conventions, but this CaP-X setup does not require installing GraspVLA or adding its dependencies.
+
+### Running GPU-heavy servers on a remote GPU machine
+
+Yes — this is a feasible deployment plan:
+- **Control machine (MacBook/Ubuntu):** FR3 command/control + camera ingestion + CaP-X runner.
+- **GPU server:** SAM3 / Contact-GraspNet / Pyroki API servers.
+
+Use remote service URLs on the control machine:
+
+```bash
+export SAM3_SERVICE_URL=http://<GPU_SERVER_IP>:8114
+export GRASPNET_SERVICE_URL=http://<GPU_SERVER_IP>:8115
+export PYROKI_SERVICE_URL=http://<GPU_SERVER_IP>:8116
+```
+
+Then launch the remote-inference config:
+
+```bash
+uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/real_remote_inference.yaml
+```
+
+Notes for lag / stability:
+- Keep control + camera acquisition local to the robot network.
+- Put GPU server on wired LAN (avoid Wi-Fi for inference RPC).
+- Start with conservative motion speeds and small steps.
+- Add request timeouts / retries (already used by CaP-X service utilities).
 
 ### Multi-camera observation mapping
 

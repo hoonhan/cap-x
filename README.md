@@ -198,6 +198,8 @@ The default dual-camera extrinsics starter file is:
 
 For a practical calibration workflow (without adding extra calibration scripts), see:
 - [docs/real-franka.md](docs/real-franka.md) → **FR3 + Dual RealSense D405 (Minimal POC)** / **Practical calibration guide**
+- [docs/real-franka.md](docs/real-franka.md) → **Where to get camera serial numbers and FR3 IP**
+- [docs/real-franka.md](docs/real-franka.md) → **Running GPU-heavy servers on a remote GPU machine**
 
 ---
 

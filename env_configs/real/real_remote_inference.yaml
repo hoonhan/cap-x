@@ -1,0 +1,35 @@
+# Full real-world FR3/Franka config with remote perception/motion servers.
+# Run on your control machine (MacBook/Ubuntu box):
+#   export SAM3_SERVICE_URL=http://<GPU_SERVER_IP>:8114
+#   export GRASPNET_SERVICE_URL=http://<GPU_SERVER_IP>:8115
+#   export PYROKI_SERVICE_URL=http://<GPU_SERVER_IP>:8116
+#   uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/real_remote_inference.yaml
+
+env:
+  _target_: capx.envs.tasks.franka.franka_cube_restack.FrankaRestackCodeEnv
+  cfg:
+    _target_: capx.envs.tasks.base.CodeExecEnvConfig
+    low_level: franka_real_low_level
+    privileged: false
+    apis:
+      - FrankaRealControlApi
+    task_only_prompt: "pick up the red cube and lift it"
+    prompt: |
+      You are controlling a Franka Emika robot with API described below.
+      Goal: pick up the red cube and lift it.
+      You may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.
+      After this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.
+      The functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.
+
+api_servers: []  # Intentionally empty: use remote services via *_SERVICE_URL env vars.
+
+record_video: true
+use_img_differencing: true
+output_dir: ./outputs/franka_real_remote_inference
+
+debug: true
+web_ui: true
+# web_ui_port: 8200
+
+trials: 1
+num_workers: 1
