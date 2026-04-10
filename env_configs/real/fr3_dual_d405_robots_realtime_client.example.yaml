@@ -1,0 +1,21 @@
+# Example robots_realtime client config snippet for FR3 + dual D405.
+# Copy relevant fields into your robots_realtime client config (outside this repo),
+# typically: robots_realtime/configs/franka/franka_robotiq_client.yaml
+
+robot:
+  # Fill FR3 controller IP here.
+  ip: "<FR3_IP_ADDRESS>"  # e.g. 192.168.1.11
+
+sensors:
+  - type: RealsenseCamera
+    name: camera_top
+    # Fill D405 serial number here.
+    serial_number: "<D405_SERIAL_TOP>"
+    # Point to your extrinsics yaml inside robots_realtime repo.
+    extrinsics_file: "configs/camera_extrinsics/fr3_dual_d405_top.yaml"
+
+  - type: RealsenseCamera
+    name: camera_wrist_side
+    # Fill D405 serial number here.
+    serial_number: "<D405_SERIAL_SIDE>"
+    extrinsics_file: "configs/camera_extrinsics/fr3_dual_d405_side.yaml"

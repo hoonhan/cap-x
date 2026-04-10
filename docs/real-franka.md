@@ -29,6 +29,22 @@ Use one of the following:
 
 For reliability, prefer a DHCP reservation or static IP assignment so client configs don't break across reboots.
 
+## Exactly where to fill FR3 IP and D405 serial numbers
+
+You should fill these in the **robots_realtime client config**, not in CaP-X env YAMLs.
+
+Primary file to edit (in your robots_realtime repo):
+
+`robots_realtime/configs/franka/franka_robotiq_client.yaml`
+
+- Set **FR3 IP** under the robot/network field (commonly `robot.ip`).
+- Set each D405 **serial number** under each RealSense sensor entry (commonly `serial_number`).
+- Set each camera `extrinsics_file` to the corresponding camera extrinsics YAML.
+
+In this CaP-X repo, a reference template is provided at:
+
+`env_configs/real/fr3_dual_d405_robots_realtime_client.example.yaml`
+
 ## Camera Extrinsics Setup
 
 The `robots_realtime` client config points to a camera extrinsics file that describes the camera's pose in the robot world frame. You must create one for your own setup.
