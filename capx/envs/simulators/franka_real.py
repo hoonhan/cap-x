@@ -61,6 +61,9 @@ class RepackObsAdapter:
         if cam is not None:
             images = cam.get(b'images') or {}
             rgb = images.get(b'left_rgb')
+            if rgb is None:
+                # Some clients publish rgb under alternative names.
+                rgb = images.get(b'rgb') or images.get(b'color')
             if rgb is not None:
                 obs["robot0_robotview"]["images"]["rgb"] = np.asarray(rgb)
             depth = cam.get(b'depth_data')
@@ -151,7 +154,8 @@ class FrankaRealLowLevel(BaseEnv):
             self.viser_img_handle = None
             self.image_frustum_handle = None
             self.gripper_metric_length = 0.0584
-            self.urdf = load_robot_description("panda_description")
+            robot_description = os.environ.get("CAPX_REAL_ROBOT_DESCRIPTION", "panda_description")
+            self.urdf = load_robot_description(robot_description)
             self.urdf_vis = ViserUrdf(self.viser_server, urdf_or_path=self.urdf, load_meshes=True)
 
     

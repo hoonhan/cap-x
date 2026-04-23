@@ -56,3 +56,20 @@ In a separate terminal with the [robots_realtime](https://github.com/uynitsuj/ro
 ```bash
 uv run rr-session configs/franka/franka_robotiq_client.yaml
 ```
+
+## FR3-specific notes
+
+If your real setup is FR3, there are two places to switch away from the default Panda model:
+
+1. **Viser URDF in the real low-level env** (for the right 3D robot visualization):
+   - `capx/envs/simulators/franka_real.py` now reads the environment variable `CAPX_REAL_ROBOT_DESCRIPTION`.
+   - Default is `panda_description`.
+   - Example for FR3:
+     ```bash
+     CAPX_REAL_ROBOT_DESCRIPTION=fr3_description uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/real.yaml
+     ```
+
+2. **Pyroki server robot config** in `env_configs/real/real.yaml`:
+   - Update `api_servers[..].robot` from `panda_description` to your FR3 description package if available in your environment (e.g. `fr3_description`).
+
+If the UI stays on `Resetting environment...`, verify the incoming camera payload key under `camera_top/images`. CaP-X accepts `left_rgb`, and now also `rgb` / `color`.
