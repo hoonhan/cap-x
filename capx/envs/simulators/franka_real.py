@@ -41,9 +41,6 @@ class RepackObsAdapter:
     def convert(self, msg: Dict[str, Any]) -> Dict[str, Any]:
         obs: Dict[str, Any] = {}
 
-        if "robot_joint_pos" not in obs:
-            obs["robot_joint_pos"] = {}
-
         if "robot0_robotview" not in obs:
             obs["robot0_robotview"] = {}
 
@@ -51,7 +48,13 @@ class RepackObsAdapter:
             obs["robot0_robotview"]["images"] = {}
 
         # --- JOINTS ---
-        obs["robot_joint_pos"] = np.asarray(msg[b'left'][b'joint_pos'], dtype=np.float32)
+        # robots_realtime can publish camera-only payloads on some ticks.
+        # In those packets, `b"left"` is legitimately absent.
+        left = msg.get(b"left")
+        if left is not None:
+            joint_pos = left.get(b"joint_pos")
+            if joint_pos is not None:
+                obs["robot_joint_pos"] = np.asarray(joint_pos, dtype=np.float32)
 
         # --- CAMERA (only present at viz_freq rate) ---
         cam = msg.get(b'camera_top')
