@@ -157,7 +157,14 @@ class FrankaRealLowLevel(BaseEnv):
             self.image_frustum_handle = None
             self.gripper_metric_length = 0.0584
             robot_description = os.environ.get("CAPX_REAL_ROBOT_DESCRIPTION", "panda_description")
-            self.urdf = load_robot_description(robot_description)
+            try:
+                self.urdf = load_robot_description(robot_description)
+            except ModuleNotFoundError:
+                print(
+                    f"[FrankaRealLowLevel] robot description '{robot_description}' is unavailable; "
+                    "falling back to 'panda_description'."
+                )
+                self.urdf = load_robot_description("panda_description")
             self.urdf_vis = ViserUrdf(self.viser_server, urdf_or_path=self.urdf, load_meshes=True)
 
     

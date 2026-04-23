@@ -64,22 +64,26 @@ If your real setup is FR3, there are two places to switch away from the default 
 1. **Viser URDF in the real low-level env** (for the right 3D robot visualization):
    - `capx/envs/simulators/franka_real.py` now reads the environment variable `CAPX_REAL_ROBOT_DESCRIPTION`.
    - Default is `panda_description`.
-   - Example for FR3:
+   - Example (only if your python env includes `robot_descriptions.fr3_description`):
      ```bash
      CAPX_REAL_ROBOT_DESCRIPTION=fr3_description uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/real.yaml
      ```
+   - If that package is missing, CaP-X now falls back to `panda_description` automatically.
 
 2. **Pyroki server robot config** in `env_configs/real/real.yaml`:
-   - Update `api_servers[..].robot` from `panda_description` to your FR3 description package if available in your environment (e.g. `fr3_description`).
+   - Keep `api_servers[..].robot: panda_description` unless you have both:
+     - `robot_descriptions.fr3_description` installed, and
+     - a compatible collision sphere asset for FR3 (current repo asset is `panda_spheres.json`).
+   - If `fr3_description` is not installed, the server now falls back to `panda_description` automatically.
    - Exact edit:
      ```yaml
      - _target_: capx.serving.launch_pyroki_server.main
-       port: 8116
-       host: 127.0.0.1
-       robot: fr3_description
-       target_link: panda_hand
+      port: 8116
+      host: 127.0.0.1
+      robot: fr3_description
+      target_link: panda_hand
      ```
-   - One-line command:
+   - One-line command (only when FR3 descriptors/assets are ready):
      ```bash
      sed -i 's/robot: panda_description/robot: fr3_description/' env_configs/real/real.yaml
      ```

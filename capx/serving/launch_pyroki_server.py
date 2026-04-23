@@ -275,7 +275,15 @@ def init_pyroki_server(
 
     from robot_descriptions.loaders.yourdfpy import load_robot_description
 
-    urdf = set_min_distance_from_limits(load_robot_description(robot_urdf_name))
+    try:
+        urdf = set_min_distance_from_limits(load_robot_description(robot_urdf_name))
+    except ModuleNotFoundError:
+        logger.warning(
+            "Robot description '%s' is unavailable; falling back to 'panda_description'.",
+            robot_urdf_name,
+        )
+        robot_urdf_name = "panda_description"
+        urdf = set_min_distance_from_limits(load_robot_description(robot_urdf_name))
 
     _ROBOT = pk.Robot.from_urdf(urdf)
     # _ROBOT_COLL = pk.collision.RobotCollision.from_urdf(urdf)
