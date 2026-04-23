@@ -63,7 +63,7 @@ class RepackObsAdapter:
             rgb = images.get(b'left_rgb')
             if rgb is None:
                 # Some clients publish rgb under alternative names.
-                rgb = images.get(b'rgb') or images.get(b'color')
+                rgb = images.get(b'rgb') or images.get(b'color') or images.get(b'rg')
             if rgb is not None:
                 obs["robot0_robotview"]["images"]["rgb"] = np.asarray(rgb)
             depth = cam.get(b'depth_data')
@@ -72,6 +72,8 @@ class RepackObsAdapter:
             intrinsics = cam.get(b'intrinsics')
             if intrinsics is not None:
                 left_intr = intrinsics.get(b'left') or {}
+                if not left_intr:
+                    left_intr = intrinsics.get(b'rgb') or intrinsics.get(b'color') or intrinsics.get(b'rg') or {}
                 mat = left_intr.get(b'intrinsics_matrix')
                 if mat is not None:
                     obs["robot0_robotview"]["intrinsics"] = np.asarray(mat)

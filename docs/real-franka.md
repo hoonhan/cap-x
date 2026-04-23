@@ -71,5 +71,17 @@ If your real setup is FR3, there are two places to switch away from the default 
 
 2. **Pyroki server robot config** in `env_configs/real/real.yaml`:
    - Update `api_servers[..].robot` from `panda_description` to your FR3 description package if available in your environment (e.g. `fr3_description`).
+   - Exact edit:
+     ```yaml
+     - _target_: capx.serving.launch_pyroki_server.main
+       port: 8116
+       host: 127.0.0.1
+       robot: fr3_description
+       target_link: panda_hand
+     ```
+   - One-line command:
+     ```bash
+     sed -i 's/robot: panda_description/robot: fr3_description/' env_configs/real/real.yaml
+     ```
 
-If the UI stays on `Resetting environment...`, verify the incoming camera payload key under `camera_top/images`. CaP-X accepts `left_rgb`, and now also `rgb` / `color`.
+If the UI stays on `Resetting environment...`, verify the incoming camera payload key under `camera_top/images`. CaP-X accepts `left_rgb`, `rgb`, `color`, and `rg`. Also for intrinsics, it accepts `left`, `rgb`, `color`, and `rg`.
