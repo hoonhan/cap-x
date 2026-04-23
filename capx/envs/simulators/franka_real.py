@@ -73,7 +73,11 @@ class RepackObsAdapter:
                 obs["robot0_robotview"]["images"]["rgb"] = np.asarray(rgb)
             depth = cam.get(b'depth_data')
             if depth is not None:
-                obs["robot0_robotview"]["images"]["depth"] = np.asarray(depth)[:, :, None]
+                depth_arr = np.asarray(depth, dtype=np.float32)
+                # Many real sensors publish depth in millimeters (uint16). CaP-X expects meters.
+                if np.nanmax(depth_arr) > 50.0:
+                    depth_arr = depth_arr / 1000.0
+                obs["robot0_robotview"]["images"]["depth"] = depth_arr[:, :, None]
             intrinsics = cam.get(b'intrinsics')
             if intrinsics is not None:
                 left_intr = intrinsics.get(b'left') or {}

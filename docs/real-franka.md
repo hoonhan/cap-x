@@ -97,3 +97,12 @@ If your real setup is FR3, there are two places to switch away from the default 
      ```
 
 If the UI stays on `Resetting environment...`, verify the incoming camera payload key under `camera_top/images`. CaP-X accepts `left_rgb`, `rgb`, `color`, and `rg`. Also for intrinsics, it accepts `left`, `rgb`, `color`, and `rg`.
+
+## Troubleshooting (real camera alignment + grasping)
+
+- **Depth units must be meters in CaP-X.** If your sensor publishes `depth_data` in millimeters (typical values around 500~4000), convert to meters before point-cloud use. The real adapter now auto-converts when values look like mm-scale.
+- **Extrinsics sanity check:** in Viser, the camera frustum should point roughly toward your workspace center. If it does not:
+  1. verify `position` is in robot base/world frame (meters),
+  2. verify `rpy_radians` follows the exact convention expected by `robots_realtime`,
+  3. validate with a checkerboard/ArUco target and compare projected points.
+- **SAM/GraspNet `IndexError` after segmentation** usually indicates depth/segmentation mismatch (e.g., empty valid depth under the segmented mask), often caused by unit mismatch or incorrect extrinsics.

@@ -169,7 +169,13 @@ class FrankaControlApi(ApiBase):
         depth_img_out = Image.fromarray(depth_img)
         depth_img_out.save("depth_image.jpg")
 
-        binary_map_nan_is_zero = (~np.isnan(depth[:, :, 0])).astype(int)
+        depth_2d = depth[:, :, 0]
+        # Keep mask definition aligned with depth_color_to_pointcloud filtering.
+        valid_depth_mask = (
+            np.isfinite(depth_2d)
+            & (depth_2d >= 0.015)
+            & (depth_2d <= 20.0)
+        )
 
         if self.use_sam3:
             self._log_step("SAM3 Segmentation", f"Running SAM3 text-prompt segmentation for '{object_name}' …")
@@ -305,7 +311,12 @@ class FrankaControlApi(ApiBase):
         depth_img_out = Image.fromarray(depth_img)
         depth_img_out.save("depth_image.jpg")
 
-        binary_map_nan_is_zero = (~np.isnan(depth[:, :, 0])).astype(int)
+        depth_2d = depth[:, :, 0]
+        valid_depth_mask = (
+            np.isfinite(depth_2d)
+            & (depth_2d >= 0.015)
+            & (depth_2d <= 20.0)
+        )
 
         if self.use_sam3:
             self._log_step("SAM3 Segmentation", f"Running SAM3 for grasp target '{object_name}' …")
@@ -331,7 +342,7 @@ class FrankaControlApi(ApiBase):
                 self._log_step_update(text=f"Best detection score: {max(scores):.3f}", images=vis)
             else:
                 self._log_step_update(text=f"Best detection score: {max(scores):.3f}")
-            idxs = np.where(segmentation.flatten()[binary_map_nan_is_zero.flatten().astype(bool)].astype(bool))
+            idxs = np.where(segmentation.flatten()[valid_depth_mask.flatten()].astype(bool))
             queried_instance_idx = 1
         else:
             self._log_step("OWL-ViT Detection", f"Running OWL-ViT for grasp target '{object_name}' …")
@@ -367,7 +378,7 @@ class FrankaControlApi(ApiBase):
 
             # idxs = np.where(segmentation.flatten() == queried_instance_idx) # Old assumes there are no Nans in the depth map (happens in real ZED returns)
             idxs = np.where(
-                segmentation.flatten()[binary_map_nan_is_zero.flatten().astype(bool)]
+                segmentation.flatten()[valid_depth_mask.flatten()]
                 == queried_instance_idx
             )
 
@@ -375,6 +386,16 @@ class FrankaControlApi(ApiBase):
         points, color = depth_color_to_pointcloud(
             depth[:, :, 0], rgb, obs["robot0_robotview"]["intrinsics"]
         )
+        if len(points) == 0:
+            raise RuntimeError(
+                "Depth point cloud is empty. Check depth units (meters expected; mm should be converted), "
+                "camera depth validity, and depth/intrinsics alignment."
+            )
+        if len(idxs[0]) == 0:
+            raise RuntimeError(
+                "No valid depth-supported segmentation pixels for the selected object. "
+                "Try re-segmenting, changing camera pose, or verifying extrinsics/depth alignment."
+            )
 
         self._env.cube_points = points[idxs]
         self._env.cube_color = color[idxs]
