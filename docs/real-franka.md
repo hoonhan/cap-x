@@ -69,6 +69,10 @@ If your real setup is FR3, there are two places to switch away from the default 
      CAPX_REAL_ROBOT_DESCRIPTION=fr3_description uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/real.yaml
      ```
    - If that package is missing, CaP-X now falls back to `panda_description` automatically.
+   - You can also pass a direct URDF file path instead of a robot_descriptions name:
+     ```bash
+     CAPX_REAL_ROBOT_DESCRIPTION=/absolute/path/to/fr3.urdf uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/real.yaml
+     ```
 
 2. **Pyroki server robot config** in `env_configs/real/real.yaml`:
    - Keep `api_servers[..].robot: panda_description` unless you have both:
@@ -86,6 +90,10 @@ If your real setup is FR3, there are two places to switch away from the default 
    - One-line command (only when FR3 descriptors/assets are ready):
      ```bash
      sed -i 's/robot: panda_description/robot: fr3_description/' env_configs/real/real.yaml
+     ```
+   - You can also set this to a direct URDF path:
+     ```yaml
+     robot: /absolute/path/to/fr3.urdf
      ```
 
 If the UI stays on `Resetting environment...`, verify the incoming camera payload key under `camera_top/images`. CaP-X accepts `left_rgb`, `rgb`, `color`, and `rg`. Also for intrinsics, it accepts `left`, `rgb`, `color`, and `rg`.

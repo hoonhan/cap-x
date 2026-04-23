@@ -8,6 +8,7 @@ hot-swappable for code execution environments.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -23,6 +24,7 @@ from capx.utils.video_utils import resize_with_pad
 from capx.utils.depth_utils import depth_color_to_pointcloud
 from capx.utils.msgpack_server_client_utils import MsgpackNumpyServer
 from robot_descriptions.loaders.yourdfpy import load_robot_description
+import yourdfpy
 
 
 import asyncio
@@ -164,7 +166,10 @@ class FrankaRealLowLevel(BaseEnv):
             self.gripper_metric_length = 0.0584
             robot_description = os.environ.get("CAPX_REAL_ROBOT_DESCRIPTION", "panda_description")
             try:
-                self.urdf = load_robot_description(robot_description)
+                if Path(robot_description).suffix in {".urdf", ".xml"} and Path(robot_description).exists():
+                    self.urdf = yourdfpy.URDF.load(robot_description)
+                else:
+                    self.urdf = load_robot_description(robot_description)
             except ModuleNotFoundError:
                 print(
                     f"[FrankaRealLowLevel] robot description '{robot_description}' is unavailable; "
