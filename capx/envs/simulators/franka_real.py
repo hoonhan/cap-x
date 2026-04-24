@@ -451,8 +451,14 @@ class FrankaRealLowLevel(BaseEnv):
                         point_shape="square",
                     )
 
-            if hasattr(self, "grasp_sample"):
-                if self.grasp_sample is not None:
+            if hasattr(self, "grasp_sample") and hasattr(self, "grasp_scores"):
+                has_grasps = (
+                    self.grasp_sample is not None
+                    and self.grasp_scores is not None
+                    and np.asarray(self.grasp_sample).shape[0] > 0
+                    and np.asarray(self.grasp_scores).size > 0
+                )
+                if has_grasps:
                     grasp = self.grasp_sample[np.argmax(self.grasp_scores)]
 
                     grasp_tf = vtf.SE3.from_matrix(grasp) @ vtf.SE3.from_translation(
