@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from scipy.spatial.transform import Rotation, Slerp
 
 import capx.integrations.motion.pyroki_snippets as pks
+import yourdfpy
 
 
 def slerp_quaternions(
@@ -275,7 +276,19 @@ def init_pyroki_server(
 
     from robot_descriptions.loaders.yourdfpy import load_robot_description
 
-    urdf = set_min_distance_from_limits(load_robot_description(robot_urdf_name))
+    urdf_path = Path(robot_urdf_name)
+    try:
+        if urdf_path.suffix in {".urdf", ".xml"} and urdf_path.exists():
+            urdf = set_min_distance_from_limits(yourdfpy.URDF.load(str(urdf_path)))
+        else:
+            urdf = set_min_distance_from_limits(load_robot_description(robot_urdf_name))
+    except ModuleNotFoundError:
+        logger.warning(
+            "Robot description '%s' is unavailable; falling back to 'panda_description'.",
+            robot_urdf_name,
+        )
+        robot_urdf_name = "panda_description"
+        urdf = set_min_distance_from_limits(load_robot_description(robot_urdf_name))
 
     _ROBOT = pk.Robot.from_urdf(urdf)
     # _ROBOT_COLL = pk.collision.RobotCollision.from_urdf(urdf)

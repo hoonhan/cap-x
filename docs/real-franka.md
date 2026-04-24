@@ -56,3 +56,53 @@ In a separate terminal with the [robots_realtime](https://github.com/uynitsuj/ro
 ```bash
 uv run rr-session configs/franka/franka_robotiq_client.yaml
 ```
+
+## FR3-specific notes
+
+If your real setup is FR3, there are two places to switch away from the default Panda model:
+
+1. **Viser URDF in the real low-level env** (for the right 3D robot visualization):
+   - `capx/envs/simulators/franka_real.py` now reads the environment variable `CAPX_REAL_ROBOT_DESCRIPTION`.
+   - Default is `panda_description`.
+   - Example (only if your python env includes `robot_descriptions.fr3_description`):
+     ```bash
+     CAPX_REAL_ROBOT_DESCRIPTION=fr3_description uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/real.yaml
+     ```
+   - If that package is missing, CaP-X now falls back to `panda_description` automatically.
+   - You can also pass a direct URDF file path instead of a robot_descriptions name:
+     ```bash
+     CAPX_REAL_ROBOT_DESCRIPTION=/absolute/path/to/fr3.urdf uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/real.yaml
+     ```
+
+2. **Pyroki server robot config** in `env_configs/real/real.yaml`:
+   - Keep `api_servers[..].robot: panda_description` unless you have both:
+     - `robot_descriptions.fr3_description` installed, and
+     - a compatible collision sphere asset for FR3 (current repo asset is `panda_spheres.json`).
+   - If `fr3_description` is not installed, the server now falls back to `panda_description` automatically.
+   - Exact edit:
+     ```yaml
+     - _target_: capx.serving.launch_pyroki_server.main
+      port: 8116
+      host: 127.0.0.1
+      robot: fr3_description
+      target_link: panda_hand
+     ```
+   - One-line command (only when FR3 descriptors/assets are ready):
+     ```bash
+     sed -i 's/robot: panda_description/robot: fr3_description/' env_configs/real/real.yaml
+     ```
+   - You can also set this to a direct URDF path:
+     ```yaml
+     robot: /absolute/path/to/fr3.urdf
+     ```
+
+If the UI stays on `Resetting environment...`, verify the incoming camera payload key under `camera_top/images`. CaP-X accepts `left_rgb`, `rgb`, `color`, and `rg`. Also for intrinsics, it accepts `left`, `rgb`, `color`, and `rg`.
+
+## Troubleshooting (real camera alignment + grasping)
+
+- **Depth units must be meters in CaP-X.** If your sensor publishes `depth_data` in millimeters (typical values around 500~4000), convert to meters before point-cloud use. The real adapter now auto-converts when values look like mm-scale.
+- **Extrinsics sanity check:** in Viser, the camera frustum should point roughly toward your workspace center. If it does not:
+  1. verify `position` is in robot base/world frame (meters),
+  2. verify `rpy_radians` follows the exact convention expected by `robots_realtime`,
+  3. validate with a checkerboard/ArUco target and compare projected points.
+- **SAM/GraspNet `IndexError` after segmentation** usually indicates depth/segmentation mismatch (e.g., empty valid depth under the segmented mask), often caused by unit mismatch or incorrect extrinsics.

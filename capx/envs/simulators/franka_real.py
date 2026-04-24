@@ -8,6 +8,7 @@ hot-swappable for code execution environments.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -23,6 +24,7 @@ from capx.utils.video_utils import resize_with_pad
 from capx.utils.depth_utils import depth_color_to_pointcloud
 from capx.utils.msgpack_server_client_utils import MsgpackNumpyServer
 from robot_descriptions.loaders.yourdfpy import load_robot_description
+import yourdfpy
 
 
 import asyncio
@@ -41,9 +43,6 @@ class RepackObsAdapter:
     def convert(self, msg: Dict[str, Any]) -> Dict[str, Any]:
         obs: Dict[str, Any] = {}
 
-        if "robot_joint_pos" not in obs:
-            obs["robot_joint_pos"] = {}
-
         if "robot0_robotview" not in obs:
             obs["robot0_robotview"] = {}
 
@@ -51,21 +50,42 @@ class RepackObsAdapter:
             obs["robot0_robotview"]["images"] = {}
 
         # --- JOINTS ---
-        obs["robot_joint_pos"] = np.asarray(msg[b'left'][b'joint_pos'], dtype=np.float32)
+        # robots_realtime can publish camera-only payloads on some ticks.
+        # In those packets, `b"left"` is legitimately absent.
+        left = msg.get(b"left")
+        if left is not None:
+            joint_pos = left.get(b"joint_pos")
+            if joint_pos is not None:
+                obs["robot_joint_pos"] = np.asarray(joint_pos, dtype=np.float32)
 
         # --- CAMERA (only present at viz_freq rate) ---
         cam = msg.get(b'camera_top')
         if cam is not None:
             images = cam.get(b'images') or {}
             rgb = images.get(b'left_rgb')
+            if rgb is None:
+                # Some clients publish rgb under alternative names.
+                for alt_key in (b"rgb", b"color", b"rg"):
+                    rgb = images.get(alt_key)
+                    if rgb is not None:
+                        break
             if rgb is not None:
                 obs["robot0_robotview"]["images"]["rgb"] = np.asarray(rgb)
             depth = cam.get(b'depth_data')
             if depth is not None:
-                obs["robot0_robotview"]["images"]["depth"] = np.asarray(depth)[:, :, None]
+                depth_arr = np.asarray(depth, dtype=np.float32)
+                # Many real sensors publish depth in millimeters (uint16). CaP-X expects meters.
+                if np.nanmax(depth_arr) > 50.0:
+                    depth_arr = depth_arr / 1000.0
+                obs["robot0_robotview"]["images"]["depth"] = depth_arr[:, :, None]
             intrinsics = cam.get(b'intrinsics')
             if intrinsics is not None:
                 left_intr = intrinsics.get(b'left') or {}
+                if not left_intr:
+                    for alt_key in (b"rgb", b"color", b"rg"):
+                        left_intr = intrinsics.get(alt_key) or {}
+                        if left_intr:
+                            break
                 mat = left_intr.get(b'intrinsics_matrix')
                 if mat is not None:
                     obs["robot0_robotview"]["intrinsics"] = np.asarray(mat)
@@ -148,7 +168,18 @@ class FrankaRealLowLevel(BaseEnv):
             self.viser_img_handle = None
             self.image_frustum_handle = None
             self.gripper_metric_length = 0.0584
-            self.urdf = load_robot_description("panda_description")
+            robot_description = os.environ.get("CAPX_REAL_ROBOT_DESCRIPTION", "panda_description")
+            try:
+                if Path(robot_description).suffix in {".urdf", ".xml"} and Path(robot_description).exists():
+                    self.urdf = yourdfpy.URDF.load(robot_description)
+                else:
+                    self.urdf = load_robot_description(robot_description)
+            except ModuleNotFoundError:
+                print(
+                    f"[FrankaRealLowLevel] robot description '{robot_description}' is unavailable; "
+                    "falling back to 'panda_description'."
+                )
+                self.urdf = load_robot_description("panda_description")
             self.urdf_vis = ViserUrdf(self.viser_server, urdf_or_path=self.urdf, load_meshes=True)
 
     
@@ -420,8 +451,14 @@ class FrankaRealLowLevel(BaseEnv):
                         point_shape="square",
                     )
 
-            if hasattr(self, "grasp_sample"):
-                if self.grasp_sample is not None:
+            if hasattr(self, "grasp_sample") and hasattr(self, "grasp_scores"):
+                has_grasps = (
+                    self.grasp_sample is not None
+                    and self.grasp_scores is not None
+                    and np.asarray(self.grasp_sample).shape[0] > 0
+                    and np.asarray(self.grasp_scores).size > 0
+                )
+                if has_grasps:
                     grasp = self.grasp_sample[np.argmax(self.grasp_scores)]
 
                     grasp_tf = vtf.SE3.from_matrix(grasp) @ vtf.SE3.from_translation(

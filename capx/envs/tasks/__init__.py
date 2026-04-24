@@ -10,6 +10,7 @@ from .base import (
 )
 from .franka.franka_cube_restack import FrankaRestackCodeEnv
 from .franka.franka_lift import FrankaLiftCodeEnv
+from .franka.franka_lift_banana import FrankaLiftBananaCodeEnv
 from .franka.franka_nut_assembly import FrankaNutAssemblyCodeEnv
 from .franka.franka_pick_place import FrankaPickPlaceCodeEnv
 from .franka.franka_spill_wipe import FrankaSpillWipeCodeEnv
@@ -80,6 +81,14 @@ register_config(
 register_exec_env("franka_lift_code_env", FrankaLiftCodeEnv)
 register_config(
     "franka_lift_code_env",
+    CodeExecEnvConfig(
+        low_level="franka_robosuite_cube_lift_low_level",
+        apis=["FrankaControlPrivilegedApi"],
+    ),
+)
+register_exec_env("franka_lift_banana_code_env", FrankaLiftBananaCodeEnv)
+register_config(
+    "franka_lift_banana_code_env",
     CodeExecEnvConfig(
         low_level="franka_robosuite_cube_lift_low_level",
         apis=["FrankaControlPrivilegedApi"],

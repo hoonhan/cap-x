@@ -8,10 +8,10 @@ env:
     privileged: false
     apis:
       - FrankaRealControlApi # Not using reduced skill lib for live demo due to codegen time of low level
-    task_only_prompt: "pick up the red cube and lift it"
+    task_only_prompt: "pick up the banana and lift it"
     prompt: |
-      You are controlling a Franka Emika robot with API described below.
-      Goal: pick up the red cube and lift it.
+      You are controlling a Franka Research3 robot with API described below.
+      Goal: pick up the banana and lift it.
       You may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.
       After this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.
       The functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.
@@ -47,7 +47,7 @@ api_servers:
   - _target_: capx.serving.launch_pyroki_server.main
     port: 8116
     host: 127.0.0.1
-    robot: panda_description
+    robot: fr3_description
     target_link: panda_hand
 
 record_video: true

@@ -169,7 +169,13 @@ class FrankaControlApi(ApiBase):
         depth_img_out = Image.fromarray(depth_img)
         depth_img_out.save("depth_image.jpg")
 
-        binary_map_nan_is_zero = (~np.isnan(depth[:, :, 0])).astype(int)
+        depth_2d = depth[:, :, 0]
+        # Keep mask definition aligned with depth_color_to_pointcloud filtering.
+        valid_depth_mask = (
+            np.isfinite(depth_2d)
+            & (depth_2d >= 0.015)
+            & (depth_2d <= 20.0)
+        )
 
         if self.use_sam3:
             self._log_step("SAM3 Segmentation", f"Running SAM3 text-prompt segmentation for '{object_name}' …")
@@ -195,7 +201,7 @@ class FrankaControlApi(ApiBase):
                 self._log_step_update(text=f"Best detection score: {max(scores):.3f}", images=vis)
             else:
                 self._log_step_update(text=f"Best detection score: {max(scores):.3f}")
-            idxs = np.where(mask.flatten()[binary_map_nan_is_zero.flatten().astype(bool)].astype(bool))
+            idxs = np.where(mask.flatten()[valid_depth_mask.flatten()].astype(bool))
         else:
             self._log_step("OWL-ViT Detection", f"Running OWL-ViT detection for '{object_name}' …")
             dets = self.owl_vit_det_fn(rgb, texts=[[object_name]])
@@ -230,8 +236,7 @@ class FrankaControlApi(ApiBase):
 
             # idxs = np.where(segmentation.flatten() == queried_instance_idx) # Old assumes there are no Nans in the depth map (happens in real ZED returns)
             idxs = np.where(
-                segmentation.flatten()[binary_map_nan_is_zero.flatten().astype(bool)]
-                == queried_instance_idx
+                segmentation.flatten()[valid_depth_mask.flatten()] == queried_instance_idx
             )
 
         # points = depth_to_pointcloud(depth[:, :, 0], obs["robot0_robotview"]["intrinsics"])[idxs]
@@ -305,7 +310,12 @@ class FrankaControlApi(ApiBase):
         depth_img_out = Image.fromarray(depth_img)
         depth_img_out.save("depth_image.jpg")
 
-        binary_map_nan_is_zero = (~np.isnan(depth[:, :, 0])).astype(int)
+        depth_2d = depth[:, :, 0]
+        valid_depth_mask = (
+            np.isfinite(depth_2d)
+            & (depth_2d >= 0.015)
+            & (depth_2d <= 20.0)
+        )
 
         if self.use_sam3:
             self._log_step("SAM3 Segmentation", f"Running SAM3 for grasp target '{object_name}' …")
@@ -331,7 +341,7 @@ class FrankaControlApi(ApiBase):
                 self._log_step_update(text=f"Best detection score: {max(scores):.3f}", images=vis)
             else:
                 self._log_step_update(text=f"Best detection score: {max(scores):.3f}")
-            idxs = np.where(segmentation.flatten()[binary_map_nan_is_zero.flatten().astype(bool)].astype(bool))
+            idxs = np.where(segmentation.flatten()[valid_depth_mask.flatten()].astype(bool))
             queried_instance_idx = 1
         else:
             self._log_step("OWL-ViT Detection", f"Running OWL-ViT for grasp target '{object_name}' …")
@@ -367,7 +377,7 @@ class FrankaControlApi(ApiBase):
 
             # idxs = np.where(segmentation.flatten() == queried_instance_idx) # Old assumes there are no Nans in the depth map (happens in real ZED returns)
             idxs = np.where(
-                segmentation.flatten()[binary_map_nan_is_zero.flatten().astype(bool)]
+                segmentation.flatten()[valid_depth_mask.flatten()]
                 == queried_instance_idx
             )
 
@@ -375,6 +385,16 @@ class FrankaControlApi(ApiBase):
         points, color = depth_color_to_pointcloud(
             depth[:, :, 0], rgb, obs["robot0_robotview"]["intrinsics"]
         )
+        if len(points) == 0:
+            raise RuntimeError(
+                "Depth point cloud is empty. Check depth units (meters expected; mm should be converted), "
+                "camera depth validity, and depth/intrinsics alignment."
+            )
+        if len(idxs[0]) == 0:
+            raise RuntimeError(
+                "No valid depth-supported segmentation pixels for the selected object. "
+                "Try re-segmenting, changing camera pose, or verifying extrinsics/depth alignment."
+            )
 
         self._env.cube_points = points[idxs]
         self._env.cube_color = color[idxs]
@@ -389,18 +409,36 @@ class FrankaControlApi(ApiBase):
                 # local_regions=False,
             )
         )
-        self._env.grasp_sample_tf = vtf.SE3.from_matrix(
-            self._env.grasp_sample[self._env.grasp_scores.argmax()]
-        ) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))
-
         cam_extr_tf = vtf.SE3.from_rotation_and_translation(
             rotation=vtf.SO3(wxyz=obs["robot0_robotview"]["pose"][3:]),
             translation=obs["robot0_robotview"]["pose"][:3],
         )
+        n_candidates = len(self._env.grasp_scores)
+        if n_candidates == 0:
+            fallback_center_cam = np.asarray(self._env.cube_points).mean(axis=0)
+            fallback_tf_cam = vtf.SE3.from_rotation_and_translation(
+                rotation=vtf.SO3.identity(), translation=fallback_center_cam
+            ) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))
+            grasp_sample_tf_world = cam_extr_tf @ fallback_tf_cam
+            self._env.grasp_sample = None
+            self._env.grasp_scores = None
+            self._env.grasp_contact_pts = None
+            elapsed = time.time() - start_time
+            pos_str = np.array2string(grasp_sample_tf_world.wxyz_xyz[-3:], precision=4)
+            self._log_step_update(
+                text=(
+                    "No grasp candidates returned by Contact GraspNet; using fallback centroid grasp.\n"
+                    f"Fallback position: {pos_str} ({elapsed:.1f}s)"
+                )
+            )
+            return grasp_sample_tf_world.wxyz_xyz[-3:], grasp_sample_tf_world.wxyz_xyz[:4]
+
+        self._env.grasp_sample_tf = vtf.SE3.from_matrix(
+            self._env.grasp_sample[self._env.grasp_scores.argmax()]
+        ) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))
         grasp_sample_tf_world = cam_extr_tf @ self._env.grasp_sample_tf
 
         elapsed = time.time() - start_time
-        n_candidates = len(self._env.grasp_scores)
         best_score = float(self._env.grasp_scores.max())
         pos_str = np.array2string(grasp_sample_tf_world.wxyz_xyz[-3:], precision=4)
         self._log_step_update(
