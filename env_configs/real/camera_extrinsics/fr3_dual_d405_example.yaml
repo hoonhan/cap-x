@@ -1,0 +1,30 @@
+# FR3 + dual RealSense D405 starting extrinsics.
+#
+# These values are initialized from the user's measured camera positions and
+# look-at targets:
+#   - cam_top:        position (1.35, 0.00, 0.53), look-at (0.20, 0.00, 0.00)
+#   - cam_wrist_side: position (0.50, 0.69, 0.50), look-at (0.50, 0.00, 0.10)
+#
+# rpy_radians below are a look-at-derived initialization and may still require
+# small refinement depending on camera-frame conventions in your robots_realtime
+# sensor config.
+#
+# This setup assumes FR3 without `extended_finger`.
+#
+# Convention:
+# - Pose is in FR3 base/world frame.
+# - position: [x, y, z] meters.
+# - rpy_radians: [roll, pitch, yaw] radians.
+
+cameras:
+  camera_top:
+    # From user measurement:
+    #   position=(1.35, 0.00, 0.53), look_at=(0.20, 0.00, 0.00)
+    position: [1.35, 0.00, 0.53]
+    rpy_radians: [-3.14159, -1.13894, 1.57080]
+
+  camera_wrist_side:
+    # From user measurement:
+    #   position=(0.50, 0.69, 0.50), look_at=(0.50, 0.00, 0.10)
+    position: [0.50, 0.69, 0.50]
+    rpy_radians: [2.09616, 0.00000, -0.00000]

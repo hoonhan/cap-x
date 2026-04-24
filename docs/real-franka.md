@@ -8,6 +8,43 @@ The default task configured in [`env_configs/real/real.yaml`](../env_configs/rea
 
 Beyond a Franka Panda robot arm, this workflow requires a **stereo camera that produces calibrated metric-scale depth maps** (e.g. a ZED stereo camera). The depth data is used by SAM3 + Contact-GraspNet to generate grasp poses in 3D. A monocular RGB-only camera may be insufficient.
 
+## Where to get camera serial numbers and FR3 IP
+
+### RealSense camera serial numbers
+
+On the machine connected to your D405 cameras:
+
+```bash
+rs-enumerate-devices -s
+```
+
+This prints each camera serial number (and USB details). Use those serials in your camera client config so each stream is consistently assigned (e.g., `camera_top` vs `camera_wrist_side`).
+
+### FR3 / Franka controller IP
+
+Use one of the following:
+- **Franka Desk / controller network settings** (recommended source of truth).
+- Router / DHCP lease table for the robot MAC address.
+- `ping <robot-hostname-or-ip>` from the control PC to verify reachability.
+
+For reliability, prefer a DHCP reservation or static IP assignment so client configs don't break across reboots.
+
+## Exactly where to fill FR3 IP and D405 serial numbers
+
+You should fill these in the **robots_realtime client config**, not in CaP-X env YAMLs.
+
+Primary file to edit (in your robots_realtime repo):
+
+`robots_realtime/configs/franka/franka_robotiq_client.yaml`
+
+- Set **FR3 IP** under the robot/network field (commonly `robot.ip`).
+- Set each D405 **serial number** under each RealSense sensor entry (commonly `serial_number`).
+- Set each camera `extrinsics_file` to the corresponding camera extrinsics YAML.
+
+In this CaP-X repo, a reference template is provided at:
+
+`env_configs/real/fr3_dual_d405_robots_realtime_client.example.yaml`
+
 ## Camera Extrinsics Setup
 
 The `robots_realtime` client config points to a camera extrinsics file that describes the camera's pose in the robot world frame. You must create one for your own setup.
@@ -55,4 +92,88 @@ Waiting for observation from real environment...
 In a separate terminal with the [robots_realtime](https://github.com/uynitsuj/robots_realtime.git) repo set as the current directory, launch:
 ```bash
 uv run rr-session configs/franka/franka_robotiq_client.yaml
+```
+
+---
+
+## FR3 + Dual RealSense D405 (Minimal POC)
+
+If your goal is a **minimal real-hardware proof of concept** (small primitive motions, no grasp planning stack), use:
+
+```bash
+uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/fr3_d405_minimal.yaml
+```
+
+This config uses `FrankaRealMinimalApi`, which exposes small primitive actions:
+- `move_to_joint_positions(joints)`
+- `move_by_joint_delta(delta_joints)`
+- `set_gripper_opening(fraction)`
+- `open_gripper()`, `close_gripper()`
+- `hold_position(duration_seconds=1.0, hz=25.0)`
+- `get_camera_observation(camera_name=...)`
+
+### Dual-camera extrinsics template
+
+A starting template is provided at:
+
+`env_configs/real/camera_extrinsics/fr3_dual_d405_example.yaml`
+
+The template now includes your provided FR3 + D405 measured camera positions and look-at targets as a starting point:
+- `camera_top`: `(1.35, 0.00, 0.53)` looking at `(0.20, 0.00, 0.00)`
+- `camera_wrist_side`: `(0.50, 0.69, 0.50)` looking at `(0.50, 0.00, 0.10)`
+
+Copy these values into your `robots_realtime` camera-extrinsics configuration.
+The included `rpy_radians` are look-at-derived initial values and may need final refinement because camera-frame conventions can differ across sensor wrappers.
+
+### Practical calibration guide (no extra calibration scripts required)
+
+You mentioned `calibrate_camera` duplication is unnecessary; this workflow does **not** add any extra calibration tooling.
+
+Use this lightweight process instead:
+1. Start with the template extrinsics above.
+2. Run `rr-session` + CaP-X minimal config and view the live feed(s).
+3. Pick an object with known location in robot base frame.
+4. Compare expected vs observed object location in each camera stream.
+5. Tune each camera's `rpy_radians` (small increments, e.g. 0.02–0.05 rad) and then `position` (1–2 cm) until overlays / reprojections align.
+6. Re-verify at multiple workspace points, not just one center point.
+
+If you compare against GraspVLA configs, it can help as a **reference check** for layout conventions, but this CaP-X setup does not require installing GraspVLA or adding its dependencies.
+
+### Running GPU-heavy servers on a remote GPU machine
+
+Yes — this is a feasible deployment plan:
+- **Control machine (MacBook/Ubuntu):** FR3 command/control + camera ingestion + CaP-X runner.
+- **GPU server:** SAM3 / Contact-GraspNet / Pyroki API servers.
+
+Use remote service URLs on the control machine:
+
+```bash
+export SAM3_SERVICE_URL=http://<GPU_SERVER_IP>:8114
+export GRASPNET_SERVICE_URL=http://<GPU_SERVER_IP>:8115
+export PYROKI_SERVICE_URL=http://<GPU_SERVER_IP>:8116
+```
+
+Then launch the remote-inference config:
+
+```bash
+uv run --no-sync --active capx/envs/launch.py --config-path env_configs/real/real_remote_inference.yaml
+```
+
+Notes for lag / stability:
+- Keep control + camera acquisition local to the robot network.
+- Put GPU server on wired LAN (avoid Wi-Fi for inference RPC).
+- Start with conservative motion speeds and small steps.
+- Add request timeouts / retries (already used by CaP-X service utilities).
+
+### Multi-camera observation mapping
+
+In the real low-level adapter:
+- the first discovered `camera_*` stream is mapped to `robot0_robotview` (for compatibility),
+- additional streams are preserved under their original keys (e.g. `camera_wrist_side`).
+
+You can fetch any camera stream with:
+
+```python
+cam_top = get_camera_observation(\"robot0_robotview\")
+cam_side = get_camera_observation(\"camera_wrist_side\")
 ```

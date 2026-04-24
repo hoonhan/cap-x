@@ -40,41 +40,51 @@ class RepackObsAdapter:
 
     def convert(self, msg: Dict[str, Any]) -> Dict[str, Any]:
         obs: Dict[str, Any] = {}
-
-        if "robot_joint_pos" not in obs:
-            obs["robot_joint_pos"] = {}
-
-        if "robot0_robotview" not in obs:
-            obs["robot0_robotview"] = {}
-
-        if "images" not in obs["robot0_robotview"]:
-            obs["robot0_robotview"]["images"] = {}
+        camera_entries: list[tuple[str, Dict[str, Any]]] = []
 
         # --- JOINTS ---
         obs["robot_joint_pos"] = np.asarray(msg[b'left'][b'joint_pos'], dtype=np.float32)
 
         # --- CAMERA (only present at viz_freq rate) ---
-        cam = msg.get(b'camera_top')
-        if cam is not None:
-            images = cam.get(b'images') or {}
-            rgb = images.get(b'left_rgb')
+        for key, value in msg.items():
+            if not isinstance(key, (bytes, str)):
+                continue
+            key_str = key.decode("utf-8") if isinstance(key, bytes) else key
+            if key_str.startswith("camera_") and isinstance(value, dict):
+                camera_entries.append((key_str, value))
+
+        camera_entries.sort(key=lambda x: x[0])
+
+        for idx, (camera_key, cam) in enumerate(camera_entries):
+            cam_obs_name = "robot0_robotview" if idx == 0 else camera_key
+            obs[cam_obs_name] = {"images": {}}
+
+            images = cam.get(b"images") or {}
+            rgb = images.get(b"left_rgb") or images.get(b"rgb")
             if rgb is not None:
-                obs["robot0_robotview"]["images"]["rgb"] = np.asarray(rgb)
-            depth = cam.get(b'depth_data')
+                obs[cam_obs_name]["images"]["rgb"] = np.asarray(rgb)
+
+            depth = cam.get(b"depth_data")
             if depth is not None:
-                obs["robot0_robotview"]["images"]["depth"] = np.asarray(depth)[:, :, None]
-            intrinsics = cam.get(b'intrinsics')
+                depth_np = np.asarray(depth)
+                if depth_np.ndim == 2:
+                    depth_np = depth_np[:, :, None]
+                obs[cam_obs_name]["images"]["depth"] = depth_np
+
+            intrinsics = cam.get(b"intrinsics")
             if intrinsics is not None:
-                left_intr = intrinsics.get(b'left') or {}
-                mat = left_intr.get(b'intrinsics_matrix')
+                left_intr = intrinsics.get(b"left") or intrinsics.get("left") or {}
+                mat = left_intr.get(b"intrinsics_matrix") or left_intr.get("intrinsics_matrix")
                 if mat is not None:
-                    obs["robot0_robotview"]["intrinsics"] = np.asarray(mat)
-            pose = cam.get(b'pose')
+                    obs[cam_obs_name]["intrinsics"] = np.asarray(mat)
+
+            pose = cam.get(b"pose") or cam.get("pose")
             if pose is not None:
-                obs["robot0_robotview"]["pose"] = np.asarray(pose)
-            pose_mat = cam.get(b'pose_mat')
+                obs[cam_obs_name]["pose"] = np.asarray(pose)
+
+            pose_mat = cam.get(b"pose_mat") or cam.get("pose_mat")
             if pose_mat is not None:
-                obs["robot0_robotview"]["pose_mat"] = np.asarray(pose_mat)
+                obs[cam_obs_name]["pose_mat"] = np.asarray(pose_mat)
 
         # Include anything else the client sends (optional)
         for k, v in msg.items():

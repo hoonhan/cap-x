@@ -183,6 +183,27 @@ uv run --no-sync --active capx/envs/launch.py \
 
 ---
 
+## FR3 real-world minimal bringup (dual D405)
+
+For a low-dependency proof-of-concept on FR3 + RealSense D405, use:
+
+```bash
+uv run --no-sync --active capx/envs/launch.py \
+  --config-path env_configs/real/fr3_d405_minimal.yaml
+```
+
+The default dual-camera extrinsics starter file is:
+
+`env_configs/real/camera_extrinsics/fr3_dual_d405_example.yaml`
+
+For a practical calibration workflow (without adding extra calibration scripts), see:
+- [docs/real-franka.md](docs/real-franka.md) → **FR3 + Dual RealSense D405 (Minimal POC)** / **Practical calibration guide**
+- [docs/real-franka.md](docs/real-franka.md) → **Where to get camera serial numbers and FR3 IP**
+- [docs/real-franka.md](docs/real-franka.md) → **Exactly where to fill FR3 IP and D405 serial numbers**
+- [docs/real-franka.md](docs/real-franka.md) → **Running GPU-heavy servers on a remote GPU machine**
+
+---
+
 ## Documentation
 
 | Guide | Contents |
